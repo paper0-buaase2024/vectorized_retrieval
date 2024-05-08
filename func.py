@@ -156,6 +156,7 @@ def papers_knn_search(query_text, date_from=None, date_to=None):
         index=index_name,
         fields=source_fields,
         knn=knn,
+        size=50,
         source=False)
     return resp
 
@@ -204,3 +205,7 @@ def papers_ik_search(query_text, date_from=None, date_to=None):
         size=50,
         source=False)
     return resp
+
+
+# print(papers_knn_search("Recommendation System"))
+# print(papers_ik_search("Recommendation System"))
