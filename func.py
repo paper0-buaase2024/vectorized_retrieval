@@ -1,6 +1,7 @@
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 from sentence_transformers import SentenceTransformer
+from datetime import datetime
 import torch
 import json
 import requests
@@ -18,8 +19,8 @@ es = Elasticsearch(
     verify_certs=False
 )
 
-index_name = 'test_vector'                  # 测试用
-# index_name = 'papers_vector'              # 正式用
+# index_name = 'test_vector'                  # 测试用
+index_name = 'papers_vector'              # 正式用
 
 # 加载模型
 model = SentenceTransformer('sentence-transformers/stsb-xlm-r-multilingual')  # 后续自己训练一个？
@@ -120,13 +121,35 @@ def papers_clear():
 # for vectorized_retrieval (向量化检索)
 # id: string
 # 测试通过: 2023-04-27
-def papers_knn_search(query_text):
+def papers_knn_search(query_text, date_from=None, date_to=None):
     source_fields = ["text_field"]
+
+    knn_filter = []
+
+    if date_from is not None:
+        knn_filter.append({
+            "range": {
+                "date": {
+                    "gte": datetime.strptime(date_from, "%Y-%m-%d")
+                }
+            }
+        })
+
+    if date_to is not None:
+        knn_filter.append({
+            "range": {
+                "date": {
+                    "lte": datetime.strptime(date_to, "%Y-%m-%d")
+                }
+            }
+        })
+
     knn = [{
         "field": "vector",
         "query_vector": gen_vector(query_text),
-        "k": 10,
-        "num_candidates": 50
+        "k": 50,
+        "num_candidates": 500,
+        "filter": knn_filter
     }]
 
     resp = es.search(
@@ -140,11 +163,37 @@ def papers_knn_search(query_text):
 # for IK retrieval (分词检索)
 # id: string
 # 测试通过: 2023-04-27
-def papers_ik_search(query_text):
+def papers_ik_search(query_text, date_from=None, date_to=None):
     source_fields = ["text_field"]
+
+    ik_filter = []
+
+    if date_from is not None:
+        ik_filter.append({
+            "range": {
+                "date": {
+                    "gte": date_from
+                }
+            }
+        })
+
+    if date_to is not None:
+        ik_filter.append({
+            "range": {
+                "date": {
+                    "lte": date_to
+                }
+            }
+        })
+
     query = {
-        "match": {
-            "text_field": query_text
+        "bool": {
+            "must": {
+                "match": {
+                    "text_field": query_text
+                }
+            },
+            "filter": ik_filter
         }
     }
 
