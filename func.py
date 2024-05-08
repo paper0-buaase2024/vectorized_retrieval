@@ -16,7 +16,8 @@ es_port = 9200
 es = Elasticsearch(
     hosts=[{'host': es_host, 'port': es_port, 'scheme': 'https'}],
     basic_auth=(es_username, es_password),
-    verify_certs=False
+    verify_certs=False,
+    request_timeout=60
 )
 
 # index_name = 'test_vector'                  # 测试用
