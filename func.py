@@ -149,6 +149,7 @@ def papers_knn_search(query_text, date_from=None, date_to=None):
         "query_vector": gen_vector(query_text),
         "k": 50,
         "num_candidates": 500,
+        "similarity": 0.40,
         "filter": knn_filter
     }]
 
