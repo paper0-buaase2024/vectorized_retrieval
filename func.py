@@ -172,7 +172,7 @@ def papers_ik_search(query_text, date_from=None, date_to=None):
         ik_filter.append({
             "range": {
                 "date": {
-                    "gte": date_from
+                    "gte": datetime.strptime(date_from, "%Y-%m-%d")
                 }
             }
         })
@@ -181,7 +181,7 @@ def papers_ik_search(query_text, date_from=None, date_to=None):
         ik_filter.append({
             "range": {
                 "date": {
-                    "lte": date_to
+                    "lte": datetime.strptime(date_to, "%Y-%m-%d")
                 }
             }
         })
