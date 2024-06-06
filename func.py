@@ -213,7 +213,7 @@ def papers_ik_search(query_text, date_from=None, date_to=None):
 
 
 def papers_mix_search(query_text, date_from=None, date_to=None):
-    source_fields = ['title']
+    source_fields = ['title', 'authors']
 
     mix_filter = []
 
@@ -240,7 +240,7 @@ def papers_mix_search(query_text, date_from=None, date_to=None):
             "must": {
                 "multi_match": {
                     "query": query_text,
-                    "fields": ["id^2", "text_field"],
+                    "fields": ["id^2", "authors", "text_field"],
                     "boost": 1
                 }
             },
@@ -269,6 +269,6 @@ def papers_mix_search(query_text, date_from=None, date_to=None):
     return resp
 
 
-res = papers_mix_search("Doubly Attentive Transformer Machine Translation")
+res = papers_mix_search("Hasan Sait Arslan")
 print(res)
 print(len(res['hits']['hits']))
