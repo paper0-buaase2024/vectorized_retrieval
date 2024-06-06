@@ -14,7 +14,7 @@ es_password = 'NKp1ZqZS-oOMJ+4I_nPL'        # ES密码
 es_host = '114.116.194.36'                  # ES HOST
 es_port = 9200
 es = Elasticsearch(
-    hosts=[{'host': es_host, 'port': es_port, 'scheme': 'https'}],
+    hosts=[{'host': es_host, 'port': es_port, 'scheme': 'http'}],
     basic_auth=(es_username, es_password),
     verify_certs=False,
     request_timeout=60
@@ -123,7 +123,7 @@ def papers_clear():
 # id: string
 # 测试通过: 2023-04-27
 def papers_knn_search(query_text, date_from=None, date_to=None):
-    source_fields = ["text_field"]
+    source_fields = ['title']
 
     knn_filter = []
 
@@ -149,8 +149,9 @@ def papers_knn_search(query_text, date_from=None, date_to=None):
         "field": "vector",
         "query_vector": gen_vector(query_text),
         "k": 50,
-        "num_candidates": 500,
+        "num_candidates": 100,
         "similarity": 0.40,
+        "boost": 24,
         "filter": knn_filter
     }]
 
@@ -167,7 +168,7 @@ def papers_knn_search(query_text, date_from=None, date_to=None):
 # id: string
 # 测试通过: 2023-04-27
 def papers_ik_search(query_text, date_from=None, date_to=None):
-    source_fields = ["text_field"]
+    source_fields = ['title']
 
     ik_filter = []
 
@@ -192,8 +193,10 @@ def papers_ik_search(query_text, date_from=None, date_to=None):
     query = {
         "bool": {
             "must": {
-                "match": {
-                    "text_field": query_text
+                "multi_match": {
+                    "query": query_text,
+                    "fields": ["id^2", "text_field"],
+                    "boost": 1
                 }
             },
             "filter": ik_filter
@@ -209,5 +212,63 @@ def papers_ik_search(query_text, date_from=None, date_to=None):
     return resp
 
 
-# print(papers_knn_search("Recommendation System"))
-# print(papers_ik_search("Recommendation System"))
+def papers_mix_search(query_text, date_from=None, date_to=None):
+    source_fields = ['title']
+
+    mix_filter = []
+
+    if date_from is not None:
+        mix_filter.append({
+            "range": {
+                "date": {
+                    "gte": datetime.strptime(date_from, "%Y-%m-%d")
+                }
+            }
+        })
+
+    if date_to is not None:
+        mix_filter.append({
+            "range": {
+                "date": {
+                    "lte": datetime.strptime(date_to, "%Y-%m-%d")
+                }
+            }
+        })
+
+    query = {
+        "bool": {
+            "must": {
+                "multi_match": {
+                    "query": query_text,
+                    "fields": ["id^2", "text_field"],
+                    "boost": 1
+                }
+            },
+            "filter": mix_filter
+        }
+    }
+
+    knn = [{
+        "field": "vector",
+        "query_vector": gen_vector(query_text),
+        "k": 50,
+        "num_candidates": 100,
+        "similarity": 0.40,
+        "boost": 24,
+        "filter": mix_filter
+    }]
+
+    resp = es.search(
+        index=index_name,
+        fields=source_fields,
+        query=query,
+        knn=knn,
+        size=50,
+        min_score=18,
+        source=False)
+    return resp
+
+
+res = papers_mix_search("Doubly Attentive Transformer Machine Translation")
+print(res)
+print(len(res['hits']['hits']))
