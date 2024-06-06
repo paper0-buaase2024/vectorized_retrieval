@@ -5,6 +5,7 @@ from datetime import datetime
 import torch
 import json
 import requests
+import re
 # 关闭安全请求警告
 requests.packages.urllib3.disable_warnings()
 
@@ -150,8 +151,7 @@ def papers_knn_search(query_text, date_from=None, date_to=None):
         "query_vector": gen_vector(query_text),
         "k": 50,
         "num_candidates": 100,
-        "similarity": 0.40,
-        "boost": 24,
+        "similarity": 0.30,
         "filter": knn_filter
     }]
 
@@ -212,12 +212,16 @@ def papers_ik_search(query_text, date_from=None, date_to=None):
     return resp
 
 
-def papers_mix_search(query_text, date_from=None, date_to=None):
-    source_fields = ['title', 'authors']
+def is_arxiv_id(string):
+    arxiv_pattern = r'^\d{4}\.\d{4,5}$'
+    match = re.match(arxiv_pattern, string)
+    return bool(match)
 
+
+def papers_mix_search(query_text, date_from='', date_to='', k=50):
+    source_fields = ['id']
     mix_filter = []
-
-    if date_from is not None:
+    if date_from != '':
         mix_filter.append({
             "range": {
                 "date": {
@@ -225,8 +229,7 @@ def papers_mix_search(query_text, date_from=None, date_to=None):
                 }
             }
         })
-
-    if date_to is not None:
+    if date_to != '':
         mix_filter.append({
             "range": {
                 "date": {
@@ -235,40 +238,58 @@ def papers_mix_search(query_text, date_from=None, date_to=None):
             }
         })
 
+    if is_arxiv_id(query_text):
+        query = {
+            "bool": {
+                "must": [
+                    {
+                        "match": {
+                            "id": query_text
+                        }
+                    }
+                ],
+                "filter": mix_filter
+            }
+        }
+        resp = es.search(
+            index=index_name,
+            fields=source_fields,
+            query=query,
+            source=False)
+        return resp
+
     query = {
         "bool": {
             "must": {
                 "multi_match": {
                     "query": query_text,
-                    "fields": ["id^2", "authors", "text_field"],
+                    "fields": ["id", "title^4", "authors^2", "text_field"],
                     "boost": 1
                 }
             },
             "filter": mix_filter
         }
     }
-
     knn = [{
         "field": "vector",
         "query_vector": gen_vector(query_text),
-        "k": 50,
-        "num_candidates": 100,
-        "similarity": 0.40,
-        "boost": 24,
+        "k": k,
+        "num_candidates": k*2,
+        "similarity": 0.30,
+        "boost": 32,
         "filter": mix_filter
     }]
-
     resp = es.search(
         index=index_name,
         fields=source_fields,
         query=query,
         knn=knn,
-        size=50,
-        min_score=18,
+        size=k,
+        min_score=15,
         source=False)
     return resp
 
 
-res = papers_mix_search("Hasan Sait Arslan")
-print(res)
-print(len(res['hits']['hits']))
+resp = papers_mix_search('2402.01771', date_from='', date_to='')
+print(len(resp['hits']['hits']))
+print(resp)
